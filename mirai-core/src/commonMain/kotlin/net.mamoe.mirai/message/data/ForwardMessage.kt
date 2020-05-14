@@ -196,6 +196,7 @@ fun Iterable<MessageEvent>.toForwardMessage(displayStrategy: DisplayStrategy = D
 /**
  * 转换为 [ForwardMessage]
  */
+@JvmOverloads
 fun Message.toForwardMessage(
     sender: User,
     time: Int = currentTimeSeconds.toInt(),
@@ -541,8 +542,6 @@ class ForwardMessageBuilder private constructor(
 
     /** 构造 [ForwardMessage] */
     fun build(): ForwardMessage = ForwardMessage(container.toList(), this.displayStrategy)
-
-    @OptIn(MiraiExperimentalAPI::class)
     internal fun Bot.smartName(): String = when (val c = this@ForwardMessageBuilder.context) {
         is Group -> c.botAsMember.nameCardOrNick
         else -> nick

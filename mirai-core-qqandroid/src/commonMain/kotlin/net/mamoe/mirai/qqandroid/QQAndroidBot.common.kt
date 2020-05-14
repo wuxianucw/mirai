@@ -70,7 +70,6 @@ internal fun Bot.asQQAndroidBot(): QQAndroidBot {
 }
 
 @Suppress("INVISIBLE_MEMBER", "BooleanLiteralArgument")
-@OptIn(MiraiInternalAPI::class)
 internal class QQAndroidBot constructor(
     context: Context,
     account: BotAccount,
@@ -232,7 +231,7 @@ internal class QQAndroidBot constructor(
     }
 }
 
-@OptIn(MiraiInternalAPI::class, MiraiExperimentalAPI::class)
+
 internal abstract class QQAndroidBotBase constructor(
     context: Context,
     private val account: BotAccount,
@@ -718,9 +717,16 @@ internal abstract class QQAndroidBotBase constructor(
     override suspend fun queryImageUrl(image: Image): String = when (image) {
         is OnlineFriendImageImpl -> image.originUrl
         is OnlineGroupImageImpl -> image.originUrl
-        is OfflineGroupImage -> "http://gchat.qpic.cn/gchatpic_new/${id}/0-0-${image.imageId.substring(1..36).replace("-", "")}/0?term=2"
-        is OfflineFriendImage -> "http://c2cpicdw.qpic.cn/offpic_new/${id}/${image.imageId}/0?term=2"
-        else -> error("unsupported image class: ${image::class.simpleName}")
+        is OfflineGroupImage -> constructOfflineImageUrl(image)
+        is OfflineFriendImage -> constructOfflineImageUrl(image)
+        else -> error("Internal error: unsupported image class: ${image::class.simpleName}")
+    }
+
+    private fun constructOfflineImageUrl(image: Image): String = when (image) {
+        is GroupImage -> "http://gchat.qpic.cn/gchatpic_new/${id}/0-0-${image.imageId.substring(1..36)
+            .replace("-", "")}/0?term=2"
+        is FriendImage -> "http://c2cpicdw.qpic.cn/offpic_new/${id}/${image.imageId}/0?term=2"
+        else -> error("Internal error: unsupported image class: ${image::class.simpleName}")
     }
 
     override fun constructMessageSource(
@@ -771,11 +777,9 @@ internal abstract class QQAndroidBotBase constructor(
 internal val EMPTY_BYTE_ARRAY = ByteArray(0)
 
 @Suppress("DEPRECATION")
-@OptIn(MiraiInternalAPI::class)
 internal expect fun io.ktor.utils.io.ByteReadChannel.toKotlinByteReadChannel(): ByteReadChannel
 
 
-@OptIn(MiraiInternalAPI::class)
 private fun RichMessage.Templates.longMessage(brief: String, resId: String, timeSeconds: Long): RichMessage {
     val limited: String = if (brief.length > 30) {
         brief.take(30) + "…"

@@ -7,11 +7,14 @@
  * https://github.com/mamoe/mirai/blob/master/LICENSE
  */
 
+@file:Suppress("unused", "INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
+
 package net.mamoe.mirai.event
 
 import kotlinx.coroutines.*
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.event.events.BotEvent
+import net.mamoe.mirai.utils.PlannedRemoval
 import kotlin.coroutines.resume
 import kotlin.jvm.JvmSynthetic
 import kotlin.reflect.KClass
@@ -30,7 +33,7 @@ import kotlin.reflect.KClass
 @JvmSynthetic
 suspend inline fun <reified E : Event> nextEvent(
     timeoutMillis: Long = -1,
-    priority: Listener.EventPriority = Listener.EventPriority.MONITOR
+    priority: Listener.EventPriority = EventPriority.MONITOR
 ): E {
     require(timeoutMillis == -1L || timeoutMillis > 0) { "timeoutMillis must be -1 or > 0" }
     return withTimeoutOrCoroutineScope(timeoutMillis) {
@@ -38,28 +41,51 @@ suspend inline fun <reified E : Event> nextEvent(
     }
 }
 
+
 /**
  * 挂起当前协程, 直到监听到事件 [E] 的广播, 返回这个事件实例.
- * 将筛选 [BotEvent.bot] 与 [this] 相等的事件.
  *
  * @param timeoutMillis 超时. 单位为毫秒. `-1` 为不限制.
  *
  * @see subscribe 普通地监听一个事件
  * @see syncFromEvent 挂起当前协程, 并尝试从事件中同步一个值
  *
- * @throws TimeoutCancellationException 在超时后抛出.
+ * @return 事件实例, 在超时后返回 `null`
  */
+@JvmSynthetic
+suspend inline fun <reified E : Event> nextEventOrNull(
+    timeoutMillis: Long,
+    priority: Listener.EventPriority = EventPriority.MONITOR
+): E? {
+    return withTimeoutOrNull(timeoutMillis) {
+        nextEventImpl(E::class, this, priority)
+    }
+}
+
+//
+//
+// 以下为已弃用的函数
+//
+//
+//
+
+
+@PlannedRemoval("1.3.0")
+@Suppress("DeprecatedCallableAddReplaceWith")
+@Deprecated(
+    "Deprecated for better Coroutine life cycle management. Please filter bot instance on your own.",
+    level = DeprecationLevel.HIDDEN
+)
 @JvmSynthetic
 suspend inline fun <reified E : BotEvent> Bot.nextEvent(
     timeoutMillis: Long = -1,
-    priority: Listener.EventPriority = Listener.EventPriority.MONITOR
+    priority: Listener.EventPriority = EventPriority.MONITOR
 ): E {
     require(timeoutMillis == -1L || timeoutMillis > 0) { "timeoutMillis must be -1 or > 0" }
     return withTimeoutOrCoroutineScope(timeoutMillis) {
         nextBotEventImpl(this@nextEvent, E::class, this, priority)
     }
 }
-
 
 @JvmSynthetic
 @PublishedApi

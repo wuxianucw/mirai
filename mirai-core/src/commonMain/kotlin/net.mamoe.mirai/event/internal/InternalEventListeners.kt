@@ -15,7 +15,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import net.mamoe.mirai.event.*
 import net.mamoe.mirai.event.events.BotEvent
-import net.mamoe.mirai.utils.*
+import net.mamoe.mirai.utils.LockFreeLinkedList
+import net.mamoe.mirai.utils.MiraiInternalAPI
+import net.mamoe.mirai.utils.MiraiLogger
+import net.mamoe.mirai.utils.PlannedRemoval
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 import kotlin.jvm.JvmField
@@ -26,10 +29,8 @@ internal fun <L : Listener<E>, E : Event> KClass<out E>.subscribeInternal(listen
     with(GlobalEventListeners[listener.priority]) {
         @Suppress("UNCHECKED_CAST")
         val node = ListenerNode(listener as Listener<Event>, this@subscribeInternal)
-        @OptIn(MiraiInternalAPI::class)
         addLast(node)
         listener.invokeOnCompletion {
-            @OptIn(MiraiInternalAPI::class)
             this.remove(node)
         }
     }
@@ -47,7 +48,7 @@ internal fun <E : Event> CoroutineScope.Handler(
 ): Handler<E> {
     @OptIn(ExperimentalCoroutinesApi::class) // don't remove
     val context = this.newCoroutineContext(coroutineContext)
-    return Handler(context[Job], context, handler, concurrencyKind, Listener.EventPriority.NORMAL)
+    return Handler(context[Job], context, handler, concurrencyKind, EventPriority.NORMAL)
 }
 
 
@@ -55,7 +56,7 @@ internal fun <E : Event> CoroutineScope.Handler(
 internal fun <E : Event> CoroutineScope.Handler(
     coroutineContext: CoroutineContext,
     concurrencyKind: Listener.ConcurrencyKind,
-    priority: Listener.EventPriority = Listener.EventPriority.NORMAL,
+    priority: Listener.EventPriority = EventPriority.NORMAL,
     handler: suspend (E) -> ListeningStatus
 ): Handler<E> {
     @OptIn(ExperimentalCoroutinesApi::class) // don't remove
@@ -128,13 +129,11 @@ internal expect class MiraiAtomicBoolean(initial: Boolean) {
 // inline: NO extra Continuation
 @Suppress("UNCHECKED_CAST")
 internal suspend inline fun Event.broadcastInternal() {
-    @OptIn(MiraiExperimentalAPI::class)
     if (EventDisabled) return
     callAndRemoveIfRequired(this@broadcastInternal as? AbstractEvent ?: error("Events must extends AbstractEvent"))
 }
 
 @Suppress("DuplicatedCode")
-@OptIn(MiraiInternalAPI::class)
 internal suspend fun <E : AbstractEvent> callAndRemoveIfRequired(
     event: E
 ) {
@@ -163,7 +162,7 @@ internal suspend fun <E : AbstractEvent> callAndRemoveIfRequired(
         }
     }
     coroutineScope {
-        GlobalEventListeners[Listener.EventPriority.MONITOR].forEachNode { eventNode ->
+        GlobalEventListeners[EventPriority.MONITOR].forEachNode { eventNode ->
             if (event.isIntercepted) {
                 return@coroutineScope
             }

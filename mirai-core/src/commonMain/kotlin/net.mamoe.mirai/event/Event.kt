@@ -11,12 +11,13 @@
 
 package net.mamoe.mirai.event
 
-import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CoroutineScope
+import net.mamoe.mirai.JavaFriendlyAPI
 import net.mamoe.mirai.event.internal.broadcastInternal
 import net.mamoe.mirai.utils.MiraiExperimentalAPI
-import net.mamoe.mirai.utils.MiraiInternalAPI
-import net.mamoe.mirai.utils.PlannedRemoval
 import net.mamoe.mirai.utils.SinceMirai
+import net.mamoe.mirai.utils.internal.runBlocking
+import kotlin.jvm.JvmName
 import kotlin.jvm.JvmSynthetic
 import kotlin.jvm.Volatile
 
@@ -33,19 +34,27 @@ import kotlin.jvm.Volatile
  * @see subscribeMessages
  *
  * @see [broadcast] 广播事件
- * @see [subscribe] 监听事件
+ * @see [CoroutineScope.subscribe] 监听事件
+ *
+ * @see CancellableEvent 可被取消的事件
  */
 interface Event {
     /**
      * 事件是否已被拦截.
      *
      * 所有事件都可以被拦截, 拦截后低优先级的监听器将不会处理到这个事件.
+     *
+     * @see intercept 拦截事件
      */
     @SinceMirai("1.0.0")
     val isIntercepted: Boolean
 
     /**
      * 拦截这个事件
+     *
+     * 当事件被 [拦截][Event.intercept] 后, 优先级较低 (靠右) 的监听器将不会被调用.
+     *
+     * @see [Listener.EventPriority] 查看优先级相关信息
      */
     @SinceMirai("1.0.0")
     fun intercept()
@@ -76,7 +85,9 @@ abstract class AbstractEvent : Event {
 
     @Volatile
     private var _intercepted = false
-    private val _cancelled = atomic(false)
+
+    @Volatile
+    private var _cancelled = false
 
     // 实现 Event
     /**
@@ -98,7 +109,7 @@ abstract class AbstractEvent : Event {
     /**
      * @see CancellableEvent.isCancelled
      */
-    val isCancelled: Boolean get() = _cancelled.value
+    val isCancelled: Boolean get() = _cancelled
 
     /**
      * @see CancellableEvent.cancel
@@ -107,7 +118,7 @@ abstract class AbstractEvent : Event {
         check(this is CancellableEvent) {
             "Event $this is not cancellable"
         }
-        _cancelled.value = true
+        _cancelled = true
     }
 }
 
@@ -134,13 +145,29 @@ interface CancellableEvent : Event {
 
 /**
  * 广播一个事件的唯一途径.
+ * @see __broadcastJava
  */
-@OptIn(MiraiInternalAPI::class)
+@JvmSynthetic
 suspend fun <E : Event> E.broadcast(): E = apply {
     if (this is BroadcastControllable && !this.shouldBroadcast) {
         return@apply
     }
     this@broadcast.broadcastInternal() // inline, no extra cost
+}
+
+/**
+ * 在 Java 广播一个事件的唯一途径.
+ *
+ * 调用方法: `EventKt.broadcast(event)`
+ */
+@Suppress("FunctionName")
+@JvmName("broadcast")
+@JavaFriendlyAPI
+fun <E : Event> E.__broadcastJava(): E = apply {
+    if (this is BroadcastControllable && !this.shouldBroadcast) {
+        return@apply
+    }
+    runBlocking { this@__broadcastJava.broadcastInternal() }
 }
 
 /**
@@ -161,11 +188,3 @@ interface BroadcastControllable : Event {
         get() = true
 }
 
-
-@PlannedRemoval("1.1.0")
-@Deprecated(
-    "use AbstractEvent and implement CancellableEvent",
-    level = DeprecationLevel.ERROR,
-    replaceWith = ReplaceWith("AbstractEvent", "net.mamoe.mirai.event.AbstractEvent")
-)
-abstract class AbstractCancellableEvent : AbstractEvent(), CancellableEvent

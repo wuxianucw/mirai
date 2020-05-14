@@ -92,15 +92,12 @@ expect interface Image : Message, MessageContent {
 /**
  * 群图片.
  *
- * 群拖
- *
  * @property imageId 形如 `{01E9451B-70ED-EAE3-B37C-101F1EEBF5B5}.mirai` (后缀一定为 `".mirai"`)
  * @see Image 查看更多说明
  */
 @PlannedRemoval("1.2.0") // make internal
 @Suppress("DEPRECATION_ERROR")
 // CustomFace
-@OptIn(MiraiInternalAPI::class)
 sealed class GroupImage : AbstractImage() {
     companion object Key : Message.Key<GroupImage> {
         override val typeName: String get() = "GroupImage"
@@ -124,7 +121,6 @@ val Image.md5: ByteArray
  */ // NotOnlineImage
 @PlannedRemoval("1.2.0") // make internal
 @Suppress("DEPRECATION_ERROR")
-@OptIn(MiraiInternalAPI::class)
 sealed class FriendImage : AbstractImage() {
     companion object Key : Message.Key<FriendImage> {
         override val typeName: String get() = "FriendImage"
@@ -190,7 +186,6 @@ fun Image(imageId: String): OfflineImage = when {
 @JvmSynthetic
 suspend fun Image.queryUrl(): String {
     @Suppress("DEPRECATION")
-    @OptIn(MiraiInternalAPI::class)
     return when (this) {
         is OnlineImage -> this.originUrl
         else -> BotImpl.instances.peekFirst().get()?.queryImageUrl(this)
@@ -248,7 +243,6 @@ interface OfflineImage : Image {
 )
 @JvmSynthetic
 suspend fun OfflineImage.queryUrl(): String {
-    @OptIn(MiraiInternalAPI::class)
     return BotImpl.instances.peekFirst().get()?.queryImageUrl(this) ?: error("No Bot available to query image url")
 }
 

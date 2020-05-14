@@ -34,6 +34,9 @@ mirai 既可以作为项目中的 QQ 协议支持库, 也可以作为单独的�
 
 ## 协议支持
 
+<details>
+  <summary>支持的协议协议列表</summary>
+
 | 消息相关                    | 支持              |
 |:----------------------|:----------------|
 | 文字                  | 群聊 \| 好友 \| 临时会话 |
@@ -48,7 +51,6 @@ mirai 既可以作为项目中的 QQ 协议支持库, 也可以作为单独的�
 | At (含 At 全体成员)                  | 群聊 |
 | 撤回群员消息                  | 群聊 |
 
-
 | 群相关                    |
 |:----------------------|
 | 完整群列表; 完整群成员列表|
@@ -62,6 +64,8 @@ mirai 既可以作为项目中的 QQ 协议支持库, 也可以作为单独的�
 |:----|
 | 完整好友列表 |
 | 处理新好友申请 |
+
+</details>
 
 #### 不会支持的协议:
 - 点赞
@@ -80,16 +84,18 @@ mirai 既可以作为项目中的 QQ 协议支持库, 也可以作为单独的�
 
 ### 开发者
 
-**了解 mirai 架构**： [Wiki](https://github.com/mamoe/mirai/wiki/Home) 
+**阅读文档**： [docs/mirai.md](docs/mirai.md)
 
 #### 使用 mirai 作为服务器，为 mirai 开发插件
 
 - （官方）`Java` 或 `Kotlin`： 为 [mirai-console](https://github.com/mamoe/mirai-console) 直接编写插件并与其他插件开发者合作共享
-- （官方）`C`, `C++` 等原生语言： [mirai-native](https://github.com/iTXTech/mirai-native) 支持酷Q插件在mirai上运行
+- （官方）`Kotlin Script`： [mirai-kts](https://github.com/iTXTech/mirai-kts) 支持使用`kts`编写插件，享受`Kotlin`带来的一切便利（**仅支持OpenJDK 8以上环境，不支持Android**）
+- （官方）`C`, `C++` 等原生语言： [mirai-native](https://github.com/iTXTech/mirai-native) 支持酷Q插件在mirai上运行 **(仅限`Windows 32位JRE`/支持`Wine`)**
+- （官方）`JavaScript`： [mirai-js](https://github.com/iTXTech/mirai-js) 支持使用`JavaScript`编写插件并**直接**与`Mirai`交互
 - （社区）`Python`: [python-mirai](https://github.com/NatriumLab/python-mirai) 基于 `mirai-api-http` 的机器人开发框架
 - （社区）`JavaScript`(`Node.js`): [node-mirai](https://github.com/RedBeanN/node-mirai) mirai 的 Node.js SDK
 - （社区）`Go`: [gomirai](https://github.com/Logiase/gomirai) 基于 mirai-api-http 的 GoLang SDK
-- （社区）`Mozilla Rhino`: [mirai-rhinojs-sdk](https://github.com/StageGuard/mirai-rhinojs-sdk)为基于 Rhino(如 Auto.js 等安卓 app 或运行环境)的 JavaScript 提供简单易用的 SDK
+- （社区）`Mozilla Rhino`: [mirai-rhinojs-sdk](https://github.com/StageGuard/mirai-rhinojs-sdk) 为基于 Rhino(如 Auto.js 等安卓 app 或运行环境)的 JavaScript 提供简单易用的 SDK
 - （社区）`Lua`: [lua-mirai](https://github.com/only52607/lua-mirai) 基于mirai-core 的Lua SDK，并提供了java扩展支持，可在lua中调用java代码开发机器人
 - （社区）`C++`: [mirai-cpp](https://github.com/cyanray/mirai-cpp) mirai-http-api 的 C++ 封装，方便使用 C++ 开发 mirai-http-api 插件
 - （社区）`C++`: [miraipp](https://github.com/Chlorie/miraipp-template) mirai-http-api 的另一个 C++ 封装，使用现代 C++ 特性，并提供了较完善的说明文档
@@ -126,10 +132,9 @@ Demos: [mirai-demos](https://github.com/mamoe/mirai-demos)
 
 ## 更新日志
 
-* 在 [Project](https://github.com/mamoe/mirai/projects/3) 查看已支持功能和计划
 * 在 [CHANGELOG](https://github.com/mamoe/mirai/blob/master/CHANGELOG.md) 查看版本更新记录 (仅发布的版本)
 
-## [贡献](https://github.com/mamoe/mirai/blob/master/CONTRIBUTING.md)
+## [贡献](CONTRIBUTING.md)
 
 我们欢迎一切形式的贡献。  
 我们也期待有更多人能加入 mirai 的开发。  

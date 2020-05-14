@@ -1,3 +1,14 @@
+/*
+ * Copyright 2020 Mamoe Technologies and contributors.
+ *
+ * 此源代码的使用受 GNU AFFERO GENERAL PUBLIC LICENSE version 3 许可证的约束, 可以在以下链接找到该许可证.
+ * Use of this source code is governed by the GNU AGPLv3 license that can be found through the following link.
+ *
+ * https://github.com/mamoe/mirai/blob/master/LICENSE
+ */
+
+@file:Suppress("INVISIBLE_MEMBER")
+
 package net.mamoe.mirai.qqandroid.network.protocol.packet.chat
 
 import kotlinx.io.core.ByteReadPacket
@@ -52,7 +63,7 @@ internal class NewContact {
                             struct.msgSeq,
                             msgAdditional,
                             struct.reqUin,
-                            Group.calculateGroupUinByGroupCode(groupCode),
+                            groupCode,
                             reqUinNick
                         )
                     }
@@ -143,7 +154,7 @@ internal class NewContact {
                                     bot,
                                     struct.msgSeq,
                                     actionUin,
-                                    Group.calculateGroupUinByGroupCode(groupCode),
+                                    groupCode,
                                     groupName,
                                     actionUinNick
                                 )
@@ -155,7 +166,7 @@ internal class NewContact {
                                     struct.msgSeq,
                                     msgAdditional,
                                     struct.reqUin,
-                                    Group.calculateGroupUinByGroupCode(groupCode),
+                                    groupCode,
                                     groupName,
                                     reqUinNick
                                 )
@@ -185,7 +196,7 @@ internal class NewContact {
                                     true -> 11 // accept
                                     false -> 12 // reject
                                 },
-                                groupCode = Group.calculateGroupCodeByGroupUin(event.groupId),
+                                groupCode = event.groupId,
                                 msg = "",
                                 remark = "",
                                 blacklist = blackList

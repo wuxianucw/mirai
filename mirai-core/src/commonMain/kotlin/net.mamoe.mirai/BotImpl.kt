@@ -30,7 +30,6 @@ import kotlin.time.measureTime
 /*
  * 泛型 N 不需要向外(接口)暴露.
  */
-@OptIn(MiraiExperimentalAPI::class)
 @MiraiInternalAPI
 abstract class BotImpl<N : BotNetworkHandler> constructor(
     context: Context,
@@ -70,7 +69,7 @@ abstract class BotImpl<N : BotNetworkHandler> constructor(
                     }
                 }
             }
-            throw NoSuchElementException()
+            throw NoSuchElementException(qq.toString())
         }
     }
 
@@ -92,8 +91,15 @@ abstract class BotImpl<N : BotNetworkHandler> constructor(
     @Suppress("unused")
     private val offlineListener: Listener<BotOfflineEvent> =
         this@BotImpl.subscribeAlways(concurrency = Listener.ConcurrencyKind.LOCKED) { event ->
+            if (event.bot != this@BotImpl) {
+                return@subscribeAlways
+            }
+            if (!::_network.isInitialized) {
+                // bot 还未登录就被 close
+                return@subscribeAlways
+            }
             if (network.areYouOk() && event !is BotOfflineEvent.Force) {
-                // avoid concurrent re-login tasks
+                // network 运行正常
                 return@subscribeAlways
             }
             when (event) {
@@ -108,8 +114,10 @@ abstract class BotImpl<N : BotNetworkHandler> constructor(
 
                     val time = measureTime {
                         tailrec suspend fun reconnect() {
-                            retryCatching<Unit>(configuration.reconnectionRetryTimes,
-                                except = LoginFailedException::class) { tryCount, _ ->
+                            retryCatching<Unit>(
+                                configuration.reconnectionRetryTimes,
+                                except = LoginFailedException::class
+                            ) { tryCount, _ ->
                                 if (tryCount != 0) {
                                     delay(configuration.reconnectPeriodMillis)
                                 }
@@ -138,7 +146,7 @@ abstract class BotImpl<N : BotNetworkHandler> constructor(
                         reconnect()
                     }
 
-                    logger.info { "Reconnected successfully in ${time.inMilliseconds} ms" }
+                    logger.info { "Reconnected successfully in ${time.asHumanReadable}" }
                 }
                 is BotOfflineEvent.Active -> {
                     val msg = if (event.cause == null) {
@@ -240,16 +248,21 @@ abstract class BotImpl<N : BotNetworkHandler> constructor(
 
     init {
         coroutineContext[Job]!!.invokeOnCompletion { throwable ->
+            instances.removeIf { it.get()?.id == this.id }
+
             network.close(throwable)
             offlineListener.cancel(CancellationException("Bot cancelled", throwable))
 
+            // help GC release instances
+            groups.forEach {
+                it.members.delegate.clear()
+            }
             groups.delegate.clear() // job is cancelled, so child jobs are to be cancelled
             friends.delegate.clear()
-            instances.removeIf { it.get()?.id == this.id }
         }
     }
 
-    @OptIn(MiraiInternalAPI::class)
+
     override fun close(cause: Throwable?) {
         if (!this.isActive) {
             // already cancelled
@@ -258,14 +271,14 @@ abstract class BotImpl<N : BotNetworkHandler> constructor(
         this.launch {
             BotOfflineEvent.Active(this@BotImpl, cause).broadcast()
         }
+        logger.info { "Bot cancelled" + cause?.message?.let { ": $it" }.orEmpty() }
         if (cause == null) {
-            this.cancel()
+            supervisorJob.cancel()
         } else {
-            this.cancel(CancellationException("bot cancelled", cause))
+            supervisorJob.cancel(CancellationException("Bot closed", cause))
         }
     }
 }
-
 
 @RequiresOptIn(level = RequiresOptIn.Level.ERROR)
 internal annotation class ThisApiMustBeUsedInWithConnectionLockBlock

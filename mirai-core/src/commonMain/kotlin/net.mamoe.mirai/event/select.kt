@@ -18,7 +18,6 @@ import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.message.isContextIdenticalWith
 import net.mamoe.mirai.message.nextMessage
 import net.mamoe.mirai.utils.MiraiExperimentalAPI
-import kotlin.experimental.ExperimentalTypeInference
 import kotlin.jvm.JvmName
 import kotlin.jvm.JvmSynthetic
 
@@ -28,7 +27,7 @@ import kotlin.jvm.JvmSynthetic
  *
  * 创建的所有事件监听器都会判断发送人信息 ([isContextIdenticalWith]), 监听之后的所有消息.
  *
- * [selectBuilder] DSL 类似于 [subscribeMessages] 的 DSL, 屏蔽了一些 `reply` DSL 以确保类型安全
+ * [selectBuilder] DSL 类似于 [CoroutineScope.subscribeMessages] 的 DSL, 屏蔽了一些 `reply` DSL 以确保类型安全
  *
  * ```kotlin
  * reply("开启复读模式")
@@ -62,20 +61,19 @@ import kotlin.jvm.JvmSynthetic
 suspend inline fun <reified T : MessageEvent> T.whileSelectMessages(
     timeoutMillis: Long = -1,
     filterContext: Boolean = true,
-    priority: Listener.EventPriority = Listener.EventPriority.MONITOR,
+    priority: Listener.EventPriority = EventPriority.MONITOR,
     crossinline selectBuilder: @MessageDsl MessageSelectBuilder<T, Boolean>.() -> Unit
 ) = whileSelectMessagesImpl(timeoutMillis, filterContext, priority, selectBuilder)
 
 /**
  * [selectMessages] 的 [Unit] 返回值捷径 (由于 Kotlin 无法推断 [Unit] 类型)
  */
-@OptIn(ExperimentalTypeInference::class)
 @MiraiExperimentalAPI
 @JvmName("selectMessages1")
 suspend inline fun <reified T : MessageEvent> T.selectMessagesUnit(
     timeoutMillis: Long = -1,
     filterContext: Boolean = true,
-    priority: Listener.EventPriority = Listener.EventPriority.MONITOR,
+    priority: Listener.EventPriority = EventPriority.MONITOR,
     crossinline selectBuilder: @MessageDsl MessageSelectBuilderUnit<T, Unit>.() -> Unit
 ) = selectMessagesImpl(timeoutMillis, true, filterContext, priority, selectBuilder)
 
@@ -85,7 +83,7 @@ suspend inline fun <reified T : MessageEvent> T.selectMessagesUnit(
  *
  * 创建的所有事件监听器都会判断发送人信息 ([isContextIdenticalWith]), 监听之后的所有消息.
  *
- * [selectBuilder] DSL 类似于 [subscribeMessages] 的 DSL, 屏蔽了一些 `reply` DSL 以确保类型安全
+ * [selectBuilder] DSL 类似于 [CoroutineScope.subscribeMessages] 的 DSL, 屏蔽了一些 `reply` DSL 以确保类型安全
  *
  * ```kotlin
  * val value: String = selectMessages {
@@ -105,7 +103,7 @@ suspend inline fun <reified T : MessageEvent> T.selectMessagesUnit(
 suspend inline fun <reified T : MessageEvent, R> T.selectMessages(
     timeoutMillis: Long = -1,
     filterContext: Boolean = true,
-    priority: Listener.EventPriority = Listener.EventPriority.MONITOR,
+    priority: Listener.EventPriority = EventPriority.MONITOR,
     // @BuilderInference
     crossinline selectBuilder: @MessageDsl MessageSelectBuilder<T, R>.() -> Unit
 ): R =
@@ -117,7 +115,7 @@ suspend inline fun <reified T : MessageEvent, R> T.selectMessages(
 /**
  * [selectMessages] 时的 DSL 构建器.
  *
- * 它是特殊化的消息监听 ([subscribeMessages]) DSL, 屏蔽了一些 `reply` DSL 以确保作用域安全性
+ * 它是特殊化的消息监听 ([CoroutineScope.subscribeMessages]) DSL, 屏蔽了一些 `reply` DSL 以确保作用域安全性
  *
  * @see MessageSelectBuilderUnit 查看上层 API
  */
@@ -232,7 +230,7 @@ abstract class MessageSelectBuilder<M : MessageEvent, R> @PublishedApi internal 
 /**
  * [selectMessagesUnit] 或 [selectMessages] 时的 DSL 构建器.
  *
- * 它是特殊化的消息监听 ([subscribeMessages]) DSL
+ * 它是特殊化的消息监听 ([CoroutineScope.subscribeMessages]) DSL
  *
  * @see MessageSubscribersBuilder 查看上层 API
  */
@@ -474,7 +472,6 @@ internal val ExceptionHandlerIgnoringCancellationException = CoroutineExceptionH
 
 @PublishedApi
 @BuilderInference
-@OptIn(ExperimentalTypeInference::class)
 internal suspend inline fun <reified T : MessageEvent, R> T.selectMessagesImpl(
     timeoutMillis: Long = -1,
     isUnit: Boolean,

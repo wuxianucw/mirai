@@ -15,6 +15,7 @@ package net.mamoe.mirai.message
 
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import net.mamoe.mirai.event.EventPriority
 import net.mamoe.mirai.event.Listener
 import net.mamoe.mirai.event.syncFromEvent
 import net.mamoe.mirai.event.syncFromEventOrNull
@@ -48,7 +49,7 @@ fun MessageEvent.isContextIdenticalWith(another: MessageEvent): Boolean {
 @JvmSynthetic
 suspend inline fun <reified P : MessageEvent> P.nextMessage(
     timeoutMillis: Long = -1,
-    priority: Listener.EventPriority = Listener.EventPriority.MONITOR,
+    priority: Listener.EventPriority = EventPriority.MONITOR,
     noinline filter: suspend P.(P) -> Boolean = { true }
 ): MessageChain {
     return syncFromEvent<P, P>(timeoutMillis, priority) {
@@ -70,7 +71,7 @@ suspend inline fun <reified P : MessageEvent> P.nextMessage(
 @JvmSynthetic
 suspend inline fun <reified P : MessageEvent> P.nextMessageOrNull(
     timeoutMillis: Long,
-    priority: Listener.EventPriority = Listener.EventPriority.MONITOR,
+    priority: Listener.EventPriority = EventPriority.MONITOR,
     noinline filter: suspend P.(P) -> Boolean = { true }
 ): MessageChain? {
     require(timeoutMillis > 0) { "timeoutMillis must be > 0" }
@@ -86,7 +87,7 @@ suspend inline fun <reified P : MessageEvent> P.nextMessageOrNull(
 inline fun <reified P : MessageEvent> P.nextMessageAsync(
     timeoutMillis: Long = -1,
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
-    priority: Listener.EventPriority = Listener.EventPriority.MONITOR,
+    priority: Listener.EventPriority = EventPriority.MONITOR,
     noinline filter: suspend P.(P) -> Boolean = { true }
 ): Deferred<MessageChain> {
     return this.bot.async(coroutineContext) {
@@ -103,7 +104,7 @@ inline fun <reified P : MessageEvent> P.nextMessageAsync(
 inline fun <reified P : MessageEvent> P.nextMessageOrNullAsync(
     timeoutMillis: Long,
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
-    priority: Listener.EventPriority = Listener.EventPriority.MONITOR,
+    priority: Listener.EventPriority = EventPriority.MONITOR,
     noinline filter: suspend P.(P) -> Boolean = { true }
 ): Deferred<MessageChain?> {
     require(timeoutMillis > 0) { "timeoutMillis must be > 0" }

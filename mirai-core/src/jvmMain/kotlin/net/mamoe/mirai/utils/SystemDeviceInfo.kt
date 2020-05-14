@@ -36,7 +36,6 @@ fun File.loadAsDeviceInfo(context: Context = ContextImpl()): DeviceInfo {
 private val JSON = Json(JsonConfiguration.Stable)
 
 @Serializable
-@OptIn(ExperimentalUnsignedTypes::class, MiraiInternalAPI::class)
 actual open class SystemDeviceInfo actual constructor() : DeviceInfo() {
     actual constructor(context: Context) : this() {
         this.context = context
@@ -45,7 +44,7 @@ actual open class SystemDeviceInfo actual constructor() : DeviceInfo() {
     @Transient
     final override lateinit var context: Context
 
-    override val display: ByteArray = "MIRAI.200122.001".toByteArray()
+    override val display: ByteArray = "MIRAI.${getRandomString(6, '0'..'9')}.001".toByteArray()
     override val product: ByteArray = "mirai".toByteArray()
     override val device: ByteArray = "mirai".toByteArray()
     override val board: ByteArray = "mirai".toByteArray()

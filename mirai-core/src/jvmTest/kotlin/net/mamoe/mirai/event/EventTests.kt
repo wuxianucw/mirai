@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-class TestEvent : Event, AbstractEvent() {
+class TestEvent : AbstractEvent() {
     var triggered = false
 }
 
@@ -219,7 +219,6 @@ class EventTests {
     */
     fun resetEventListeners() {
         for (p in Listener.EventPriority.values()) {
-            @OptIn(MiraiInternalAPI::class)
             GlobalEventListeners[p].clear()
         }
     }

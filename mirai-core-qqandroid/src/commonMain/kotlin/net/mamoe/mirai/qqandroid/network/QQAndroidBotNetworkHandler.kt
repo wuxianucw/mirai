@@ -22,6 +22,7 @@ import kotlinx.io.core.use
 import net.mamoe.mirai.event.*
 import net.mamoe.mirai.event.events.BotOfflineEvent
 import net.mamoe.mirai.event.events.BotOnlineEvent
+import net.mamoe.mirai.event.events.BotReloginEvent
 import net.mamoe.mirai.message.MessageEvent
 import net.mamoe.mirai.network.BotNetworkHandler
 import net.mamoe.mirai.network.UnsupportedSMSLoginException
@@ -32,7 +33,7 @@ import net.mamoe.mirai.qqandroid.network.protocol.data.jce.StTroopNum
 import net.mamoe.mirai.qqandroid.network.protocol.data.proto.MsgSvc
 import net.mamoe.mirai.qqandroid.network.protocol.packet.*
 import net.mamoe.mirai.qqandroid.network.protocol.packet.chat.GroupInfoImpl
-import net.mamoe.mirai.qqandroid.network.protocol.packet.chat.receive.MessageSvc
+import net.mamoe.mirai.qqandroid.network.protocol.packet.chat.receive.MessageSvcPbGetMsg
 import net.mamoe.mirai.qqandroid.network.protocol.packet.list.FriendList
 import net.mamoe.mirai.qqandroid.network.protocol.packet.login.ConfigPushSvc
 import net.mamoe.mirai.qqandroid.network.protocol.packet.login.Heartbeat
@@ -48,10 +49,8 @@ import net.mamoe.mirai.utils.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.jvm.JvmField
 import kotlin.jvm.Volatile
-import kotlin.time.ExperimentalTime
 
 @Suppress("MemberVisibilityCanBePrivate")
-@OptIn(MiraiInternalAPI::class)
 internal class QQAndroidBotNetworkHandler(coroutineContext: CoroutineContext, bot: QQAndroidBot) : BotNetworkHandler() {
     override val bot: QQAndroidBot by bot.unsafeWeakRef()
     override val supervisor: CompletableJob = SupervisorJob(coroutineContext[Job])
@@ -112,7 +111,7 @@ internal class QQAndroidBotNetworkHandler(coroutineContext: CoroutineContext, bo
         }.also { heartbeatJob = it }
     }
 
-    @OptIn(MiraiExperimentalAPI::class)
+
     override suspend fun closeEverythingAndRelogin(host: String, port: Int, cause: Throwable?) {
         heartbeatJob?.cancel(CancellationException("relogin", cause))
         heartbeatJob?.join()
@@ -312,7 +311,7 @@ internal class QQAndroidBotNetworkHandler(coroutineContext: CoroutineContext, bo
         initGroupOk = true
     }
 
-    @OptIn(MiraiExperimentalAPI::class, ExperimentalTime::class)
+
     override suspend fun init(): Unit = coroutineScope {
         check(bot.isActive) { "bot is dead therefore network can't init" }
         check(this@QQAndroidBotNetworkHandler.isActive) { "network is dead therefore can't init" }
@@ -336,13 +335,9 @@ internal class QQAndroidBotNetworkHandler(coroutineContext: CoroutineContext, bo
             launch { reloadGroupList() }
         }
 
-        this@QQAndroidBotNetworkHandler.launch {
+        this@QQAndroidBotNetworkHandler.launch(CoroutineName("Awaiting ConfigPushSvc.PushReq")) {
             logger.info { "Awaiting ConfigPushSvc.PushReq" }
-            val resp =
-                syncFromEventOrNull<ConfigPushSvc.PushReq.PushReqResponse, ConfigPushSvc.PushReq.PushReqResponse>(
-                    10_000) { it }
-
-            when (resp) {
+            when (val resp: ConfigPushSvc.PushReq.PushReqResponse? = nextEventOrNull(10_000)) {
                 null -> logger.info { "Missing ConfigPushSvc.PushReq." }
                 is ConfigPushSvc.PushReq.PushReqResponse.Success -> {
                     logger.info { "ConfigPushSvc.PushReq: Success" }
@@ -360,12 +355,7 @@ internal class QQAndroidBotNetworkHandler(coroutineContext: CoroutineContext, bo
             }
         }
 
-        logger.info { "Syncing friend message history..." }
-        withTimeoutOrNull(30000) {
-            launch { syncFromEvent<MessageSvc.PbGetMsg.GetMsgSuccess, Unit> { Unit } }
-            MessageSvc.PbGetMsg(bot.client, MsgSvc.SyncFlag.START, currentTimeSeconds).sendAndExpect<Packet>()
-        } ?: error("timeout syncing friend message history")
-        logger.info { "Syncing friend message history: Success" }
+        syncMessageSvc()
 
         bot.firstLoginSucceed = true
 
@@ -396,27 +386,33 @@ internal class QQAndroidBotNetworkHandler(coroutineContext: CoroutineContext, bo
         Unit // dont remove. can help type inference
     }
 
-    private suspend fun doHeartBeat(): Exception? {
-        val lastException: Exception?
-        try {
-            kotlin.runCatching {
-                Heartbeat.Alive(bot.client)
-                    .sendAndExpect<Heartbeat.Alive.Response>(
-                        timeoutMillis = bot.configuration.heartbeatTimeoutMillis,
-                        retry = 2
-                    )
-                return null
-            }
+    init {
+        @Suppress("RemoveRedundantQualifierName")
+        val listener = bot.subscribeAlways<BotReloginEvent>(priority = Listener.EventPriority.MONITOR) {
+            if (bot != this.bot) return@subscribeAlways
+            this@QQAndroidBotNetworkHandler.launch { syncMessageSvc() }
+        }
+        supervisor.invokeOnCompletion { listener.cancel() }
+    }
+
+    private suspend fun syncMessageSvc() {
+        logger.info { "Syncing friend message history..." }
+        withTimeoutOrNull(30000) {
+            launch(CoroutineName("Syncing friend message history")) { syncFromEvent<MessageSvcPbGetMsg.GetMsgSuccess, Unit> { Unit } }
+            MessageSvcPbGetMsg(bot.client, MsgSvc.SyncFlag.START, currentTimeSeconds).sendAndExpect<Packet>()
+        } ?: error("timeout syncing friend message history")
+        logger.info { "Syncing friend message history: Success" }
+    }
+
+    private suspend fun doHeartBeat(): Throwable? {
+        return retryCatching(2) {
             Heartbeat.Alive(bot.client)
                 .sendAndExpect<Heartbeat.Alive.Response>(
                     timeoutMillis = bot.configuration.heartbeatTimeoutMillis,
                     retry = 2
                 )
             return null
-        } catch (e: Exception) {
-            lastException = e
-        }
-        return lastException
+        }.exceptionOrNull()
     }
 
     /**

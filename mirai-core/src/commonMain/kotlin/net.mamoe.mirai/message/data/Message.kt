@@ -7,19 +7,26 @@
  * https://github.com/mamoe/mirai/blob/master/LICENSE
  */
 
-@file:Suppress("MemberVisibilityCanBePrivate", "unused", "EXPERIMENTAL_API_USAGE", "NOTHING_TO_INLINE")
+@file:Suppress(
+    "MemberVisibilityCanBePrivate", "unused", "EXPERIMENTAL_API_USAGE",
+    "NOTHING_TO_INLINE", "INVISIBLE_MEMBER", "INVISIBLE_REFERENCE",
+    "INAPPLICABLE_JVM_NAME"
+)
 @file:JvmMultifileClass
 @file:JvmName("MessageUtils")
 
 package net.mamoe.mirai.message.data
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.fold
 import net.mamoe.mirai.contact.Contact
 import net.mamoe.mirai.message.MessageEvent
 import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.message.data.Message.Key
-import net.mamoe.mirai.utils.MiraiInternalAPI
+import net.mamoe.mirai.utils.MiraiExperimentalAPI
 import net.mamoe.mirai.utils.PlannedRemoval
-import net.mamoe.mirai.utils.SinceMirai
+import kotlin.contracts.contract
 import kotlin.jvm.JvmMultifileClass
 import kotlin.jvm.JvmName
 import kotlin.jvm.JvmSynthetic
@@ -29,7 +36,7 @@ import kotlin.jvm.JvmSynthetic
  *
  * [消息][Message] 分为
  * - [SingleMessage]:
- *   - [MessageMetadata] 消息元数据, 包括: [消息来源][MessageSource], [引用回复][QuoteReply].
+ *   - [MessageMetadata] 消息元数据, 即消息的属性. 包括: [消息来源][MessageSource], [引用回复][QuoteReply].
  *   - [MessageContent] 含内容的消息, 包括: [纯文本][PlainText], [@群员][At], [@全体成员][AtAll] 等.
  * - [MessageChain]: 不可变消息链, 链表形式链接的多个 [SingleMessage] 实例.
  *
@@ -57,11 +64,6 @@ import kotlin.jvm.JvmSynthetic
  * #### 实现规范
  * 除 [MessageChain] 外, 所有 [Message] 的实现类都有伴生对象实现 [Key] 接口.
  *
- * #### [CharSequence] 继承
- * 所有 [CharSequence] 的行为均由 [toString] 委托.
- *
- * 即, `appendable.append(message)` 相当于 `appendable.append(message.toString())`
- *
  * #### 发送消息
  * - 通过 [Contact] 中的成员函数: [Contact.sendMessage]
  * - 通过 [Message] 的扩展函数: [Message.sendTo]
@@ -82,7 +84,6 @@ import kotlin.jvm.JvmSynthetic
  *
  * @see Contact.sendMessage 发送消息
  */
-@OptIn(MiraiInternalAPI::class)
 interface Message { // must be interface. Don't consider any changes.
     /**
      * 类型 Key. 由伴生对象实现, 表示一个 [Message] 对象的类型.
@@ -165,7 +166,8 @@ interface Message { // must be interface. Don't consider any changes.
      *
      * @sample net.mamoe.mirai.message.data.ContentEqualsTest
      */
-    fun contentEquals(another: Message, ignoreCase: Boolean = false): Boolean = contentEqualsImpl(another, ignoreCase)
+    /* final */ fun contentEquals(another: Message, ignoreCase: Boolean = false): Boolean =
+        contentEqualsImpl(another, ignoreCase)
 
     /**
      * 判断内容是否与 [another] 相等.
@@ -176,7 +178,7 @@ interface Message { // must be interface. Don't consider any changes.
      *
      * @sample net.mamoe.mirai.message.data.ContentEqualsTest
      */
-    fun contentEquals(another: String, ignoreCase: Boolean = false): Boolean {
+    /* final */ fun contentEquals(another: String, ignoreCase: Boolean = false): Boolean {
         if (!this.contentToString().equals(another, ignoreCase = ignoreCase)) return false
         return when (this) {
             is SingleMessage -> true
@@ -185,22 +187,34 @@ interface Message { // must be interface. Don't consider any changes.
         }
     }
 
-    operator fun plus(another: Message): MessageChain = this.followedBy(another)
+    /* final */ operator fun plus(another: MessageChain): MessageChain = this + another as Message
+    /* final */ operator fun plus(another: Message): MessageChain = this.followedBy(another)
+    /* final */ operator fun plus(another: SingleMessage): MessageChain = this.followedBy(another)
+    /* final */ operator fun plus(another: String): MessageChain = this.followedBy(another.toMessage())
+    /* final */ operator fun plus(another: CharSequence): MessageChain = this.followedBy(another.toString().toMessage())
+    /* final */ operator fun plus(another: Iterable<Message>): MessageChain =
+        another.fold(this, Message::plus).asMessageChain()
 
-    // don't remove! avoid resolution ambiguity between `CharSequence` and `Message`
-    operator fun plus(another: SingleMessage): MessageChain = this.followedBy(another)
+    @JvmName("plusIterableString")
+    /* final */ operator fun plus(another: Iterable<String>): MessageChain =
+        another.fold(this, Message::plus).asMessageChain()
 
-    operator fun plus(another: String): MessageChain = this.followedBy(another.toMessage())
-
-    // `+ ""` will be resolved to `plus(String)` instead of `plus(CharSeq)`
-    operator fun plus(another: CharSequence): MessageChain = this.followedBy(another.toString().toMessage())
+    /* final */ operator fun plus(another: Sequence<Message>): MessageChain =
+        another.fold(this, Message::plus).asMessageChain()
 }
 
+@MiraiExperimentalAPI
+@JvmSynthetic
+@ExperimentalCoroutinesApi
+suspend inline operator fun Message.plus(another: Flow<Message>): MessageChain =
+    another.fold(this) { acc, it -> acc + it }.asMessageChain()
 
 /**
  * [Message.contentToString] 的捷径
  */
-inline val Message.content: String get() = contentToString()
+@get:JvmSynthetic
+inline val Message.content: String
+    get() = contentToString()
 
 
 /**
@@ -212,24 +226,36 @@ inline val Message.content: String get() = contentToString()
  * - [PlainText] 长度为 0
  * - [MessageChain] 所有元素都满足 [isContentEmpty]
  */
-fun Message.isContentEmpty(): Boolean = when (this) {
-    is MessageMetadata -> true
-    is PlainText -> this.content.isEmpty()
-    is MessageChain -> this.all { it.isContentEmpty() }
-    else -> false
+fun Message.isContentEmpty(): Boolean {
+    return when (this) {
+        is MessageMetadata -> true
+        is PlainText -> this.content.isEmpty()
+        is MessageChain -> this.all { it.isContentEmpty() }
+        else -> false
+    }
 }
+
 inline fun Message.isContentNotEmpty(): Boolean = !this.isContentEmpty()
 
-inline fun Message.isPlain(): Boolean = this is PlainText
-
-inline fun Message.isNotPlain(): Boolean = this !is PlainText
-
-@JvmSynthetic
-@Suppress("UNCHECKED_CAST")
-suspend inline fun <C : Contact> Message.sendTo(contact: C): MessageReceipt<C> {
-    return contact.sendMessage(this) as MessageReceipt<C>
+inline fun Message.isPlain(): Boolean {
+    contract {
+        returns(true) implies (this@isPlain is PlainText)
+        returns(false) implies (this@isPlain !is PlainText)
+    }
+    return this is PlainText
 }
 
+inline fun Message.isNotPlain(): Boolean {
+    contract {
+        returns(false) implies (this@isNotPlain is PlainText)
+        returns(true) implies (this@isNotPlain !is PlainText)
+    }
+    return this !is PlainText
+}
+
+/**
+ * 将此消息元素按顺序重复 [count] 次.
+ */
 // inline: for future removal
 inline fun Message.repeat(count: Int): MessageChain {
     if (this is ConstrainSingle<*>) {
@@ -237,36 +263,42 @@ inline fun Message.repeat(count: Int): MessageChain {
         return this.asMessageChain()
     }
     return buildMessageChain(count) {
-        add(this@repeat)
+        repeat(count) {
+            add(this@repeat)
+        }
     }
 }
 
+/**
+ * 将此消息元素按顺序重复 [count] 次.
+ */
 @JvmSynthetic
 inline operator fun Message.times(count: Int): MessageChain = this.repeat(count)
 
-@Suppress("OverridingDeprecatedMember")
+/**
+ * 单个消息元素. 与之相对的是 [MessageChain], 是多个 [SingleMessage] 的集合.
+ */
 interface SingleMessage : Message {
     @PlannedRemoval("1.2.0")
     @JvmSynthetic
-    @SinceMirai("1.0.0")
     @Deprecated("for binary compatibility", level = DeprecationLevel.HIDDEN)
     fun length(): Int = this.toString().length
 
     @PlannedRemoval("1.2.0")
     @JvmSynthetic
-    @SinceMirai("1.0.0")
     @Deprecated("for binary compatibility", level = DeprecationLevel.HIDDEN)
     fun charAt(index: Int): Char = this.toString()[index]
 
     @PlannedRemoval("1.2.0")
     @JvmSynthetic
-    @SinceMirai("1.0.0")
     @Deprecated("for binary compatibility", level = DeprecationLevel.HIDDEN)
     fun subSequence(start: Int, end: Int): CharSequence = this.toString().subSequence(start, end)
 }
 
 /**
  * 消息元数据, 即不含内容的元素.
+ *
+ * 这种类型的 [Message] 只表示一条消息的属性. 其子类为 [MessageSource], [QuoteReply]
  *
  * 所有子类的 [contentToString] 都应该返回空字符串.
  *
@@ -276,7 +308,12 @@ interface SingleMessage : Message {
  *
  * @see ConstrainSingle 约束一个 [MessageChain] 中只存在这一种类型的元素
  */
-interface MessageMetadata : SingleMessage
+interface MessageMetadata : SingleMessage {
+    /**
+     * 返回空字符串
+     */
+    /* final */  override fun contentToString(): String = ""
+}
 
 /**
  * 约束一个 [MessageChain] 中只存在这一种类型的元素. 新元素将会替换旧元素, 保持原顺序.
@@ -284,6 +321,10 @@ interface MessageMetadata : SingleMessage
  * 实现此接口的元素将会在连接时自动处理替换.
  */
 interface ConstrainSingle<out M : Message> : MessageMetadata {
+    /**
+     * 用于判断是否为同一种元素的 [Key]
+     * @see Key 查看更多信息
+     */
     val key: Key<M>
 }
 
@@ -296,8 +337,10 @@ interface ConstrainSingle<out M : Message> : MessageMetadata {
  * @see HummerMessage 一些特殊消息: [戳一戳][PokeMessage], [闪照][FlashImage]
  * @see Image 图片
  * @see RichMessage 富文本
+ * @see ServiceMessage 服务消息, 如 JSON/XML
  * @see Face 原生表情
  * @see ForwardMessage 合并转发
+ * @see Voice 语音
  */
 interface MessageContent : SingleMessage
 
@@ -307,4 +350,9 @@ interface MessageContent : SingleMessage
 @JvmSynthetic
 @Suppress("UNCHECKED_CAST")
 suspend inline fun <C : Contact> MessageChain.sendTo(contact: C): MessageReceipt<C> =
+    contact.sendMessage(this) as MessageReceipt<C>
+
+@JvmSynthetic
+@Suppress("UNCHECKED_CAST")
+suspend inline fun <C : Contact> Message.sendTo(contact: C): MessageReceipt<C> =
     contact.sendMessage(this) as MessageReceipt<C>

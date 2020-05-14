@@ -32,8 +32,11 @@ import net.mamoe.mirai.qqandroid.QQAndroidBot
 import net.mamoe.mirai.qqandroid.message.MessageSourceToTempImpl
 import net.mamoe.mirai.qqandroid.network.protocol.data.jce.StTroopMemberInfo
 import net.mamoe.mirai.qqandroid.network.protocol.packet.chat.TroopManagement
-import net.mamoe.mirai.qqandroid.network.protocol.packet.chat.receive.MessageSvc
-import net.mamoe.mirai.utils.*
+import net.mamoe.mirai.qqandroid.network.protocol.packet.chat.receive.MessageSvcPbSendMsg
+import net.mamoe.mirai.utils.ExternalImage
+import net.mamoe.mirai.utils.currentTimeSeconds
+import net.mamoe.mirai.utils.getValue
+import net.mamoe.mirai.utils.unsafeWeakRef
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 import kotlin.coroutines.CoroutineContext
@@ -68,13 +71,13 @@ internal class MemberImpl constructor(
         lateinit var source: MessageSourceToTempImpl
         bot.network.run {
             check(
-                MessageSvc.PbSendMsg.createToTemp(
+                MessageSvcPbSendMsg.createToTemp(
                     bot.client,
                     this@MemberImpl,
                     message.asMessageChain()
                 ) {
                     source = it
-                }.sendAndExpect<MessageSvc.PbSendMsg.Response>() is MessageSvc.PbSendMsg.Response.SUCCESS
+                }.sendAndExpect<MessageSvcPbSendMsg.Response>() is MessageSvcPbSendMsg.Response.SUCCESS
             ) { "send message failed" }
         }
         return MessageReceipt(source, this, null)
@@ -189,7 +192,7 @@ internal class MemberImpl constructor(
         net.mamoe.mirai.event.events.MemberUnmuteEvent(this@MemberImpl, null).broadcast()
     }
 
-    @OptIn(MiraiInternalAPI::class)
+
     @JvmSynthetic
     override suspend fun kick(message: String) {
         checkBotPermissionHigherThanThis()

@@ -20,8 +20,6 @@ import net.mamoe.mirai.message.MessageEvent
 import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.recallIn
 import net.mamoe.mirai.utils.LazyProperty
-import net.mamoe.mirai.utils.MiraiExperimentalAPI
-import net.mamoe.mirai.utils.MiraiInternalAPI
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.jvm.JvmMultifileClass
@@ -33,7 +31,7 @@ import kotlin.jvm.JvmSynthetic
  *
  *
  * ### 组成
- * MessageSource 由 metadata (元数据), form & target, content 组成
+ * [MessageSource] 由 metadata (元数据), form & target, content 组成
  *
  * #### metadata
  * - [id] 消息 id (序列号)
@@ -58,7 +56,6 @@ import kotlin.jvm.JvmSynthetic
  * @see OnlineMessageSource 在线消息的 [MessageSource]
  * @see OfflineMessageSource 离线消息的 [MessageSource]
  */
-@OptIn(MiraiExperimentalAPI::class)
 sealed class MessageSource : Message, MessageMetadata, ConstrainSingle<MessageSource> {
     companion object Key : Message.Key<MessageSource> {
         override val typeName: String get() = "MessageSource"
@@ -79,14 +76,15 @@ sealed class MessageSource : Message, MessageMetadata, ConstrainSingle<MessageSo
      *
      * #### 顺序
      * 群消息的 id 由服务器维护. 好友消息的 id 由 mirai 维护.
+     * 此 id 不一定从 0 开始.
      *
-     * - 在同一个群的消息中此值随每条消息递增 1.
+     * - 在同一个群的消息中此值随每条消息递增 1, 但此行为由服务器决定, mirai 不保证自增顺序.
      * - 在好友消息中无法保证每次都递增 1. 也可能会产生大幅跳过的情况.
      */
     abstract val id: Int
 
     /**
-     * 内部 id. 仅用于协议模块使用.
+     * 内部 id. **仅用于协议模块使用**
      *
      * 值没有顺序, 也可能为 0, 取决于服务器是否提供.
      *
@@ -98,8 +96,6 @@ sealed class MessageSource : Message, MessageMetadata, ConstrainSingle<MessageSo
      * 发送时间时间戳, 单位为秒.
      *
      * 时间戳可能来自服务器, 也可能来自 mirai, 且无法保证两者时间同步.
-     *
-     * 撤回消息时需要此值.
      */
     abstract val time: Int
 
@@ -133,11 +129,6 @@ sealed class MessageSource : Message, MessageMetadata, ConstrainSingle<MessageSo
      * 返回 `"[mirai:source:$id,$internalId]"`
      */
     final override fun toString(): String = "[mirai:source:$id,$internalId]"
-
-    /**
-     * 返回空字符串, 因 [MessageMetadata] 的约束.
-     */
-    final override fun contentToString(): String = ""
 }
 
 
@@ -162,7 +153,6 @@ sealed class MessageSource : Message, MessageMetadata, ConstrainSingle<MessageSo
  *
  * @see OnlineMessageSource.toOffline 转为 [OfflineMessageSource]
  */
-@OptIn(MiraiExperimentalAPI::class)
 sealed class OnlineMessageSource : MessageSource() {
     companion object Key : Message.Key<OnlineMessageSource> {
         override val typeName: String get() = "OnlineMessageSource"
@@ -185,6 +175,10 @@ sealed class OnlineMessageSource : MessageSource() {
      * 不论是机器人接收的消息还是发送的消息, 此属性都指向机器人能进行回复的目标.
      */
     abstract val subject: Contact
+
+    /*
+     * 以下子类型仅是覆盖了 [target], [subject], [sender] 等的类型
+     */
 
     /**
      * 由 [机器人主动发送消息][Contact.sendMessage] 产生的 [MessageSource], 可通过 [MessageReceipt] 获得.
@@ -227,7 +221,6 @@ sealed class OnlineMessageSource : MessageSource() {
 
             abstract override val target: Group
             final override val subject: Group get() = target
-            //  final override fun toString(): String = "OnlineMessageSource.ToGroup(group=${target.id})"
         }
     }
 
@@ -287,8 +280,7 @@ sealed class OnlineMessageSource : MessageSource() {
  */
 abstract class OfflineMessageSource : MessageSource() {
     companion object Key : Message.Key<OfflineMessageSource> {
-        override val typeName: String
-            get() = "OfflineMessageSource"
+        override val typeName: String get() = "OfflineMessageSource"
     }
 
     enum class Kind {
@@ -301,8 +293,6 @@ abstract class OfflineMessageSource : MessageSource() {
      * 消息种类
      */
     abstract val kind: Kind
-
-    // final override fun toString(): String = "OfflineMessageSource(sender=$senderId, target=$targetId)"
 }
 
 /**
@@ -341,19 +331,15 @@ inline fun MessageSource.isAboutFriend(): Boolean {
  * 引用这条消息
  * @see QuoteReply
  */
-fun MessageSource.quote(): QuoteReply {
-    @OptIn(MiraiInternalAPI::class)
-    return QuoteReply(this)
-}
+@JvmSynthetic
+inline fun MessageSource.quote(): QuoteReply = QuoteReply(this)
 
 /**
  * 引用这条消息. 仅从服务器接收的消息 (即来自 [MessageEvent]) 才可以通过这个方式被引用.
  * @see QuoteReply
  */
-fun MessageChain.quote(): QuoteReply {
-    @OptIn(MiraiInternalAPI::class)
-    return QuoteReply(this.source)
-}
+@JvmSynthetic
+inline fun MessageChain.quote(): QuoteReply = QuoteReply(this.source)
 
 /**
  * 撤回这条消息. 可撤回自己 2 分钟内发出的消息, 和任意时间的群成员的消息.
